@@ -3,9 +3,9 @@ from thor_requests.connect import Connect
 from thor_requests.contract import Contract
 from thor_requests.wallet import Wallet
 
-def helper_deploy(connector, wallet, contract) -> str:
+def helper_deploy(connector: Connect, wallet: Wallet, contract: Contract, param_types=None, params=None) -> str:
     ''' Deploy a smart contract and return the created contract address'''
-    res = connector.deploy(wallet, contract, None, None, 0)
+    res = connector.deploy(wallet, contract, param_types, params, 0)
     assert "id" in res
     receipt = connector.wait_for_tx_receipt(res["id"])
     created_contracts = utils.read_created_contracts(receipt)
