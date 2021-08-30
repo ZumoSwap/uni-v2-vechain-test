@@ -4,10 +4,12 @@
 
 import time
 import pytest
+from thor_requests import connect
 from thor_requests.connect import Connect
 from thor_requests.contract import Contract
 from thor_requests.wallet import Wallet
 from .helpers import (
+    helper_replay,
     helper_deploy,
     helper_call,
     helper_transact,
@@ -20,9 +22,12 @@ from .fixtures import (
     clean_wallet,
     vvet_contract,
     factory_contract,
-    router02_contract
+    router02_contract,
+    v2pair_contract,
+    erc20_contract
 )
 
+AMOUNT = 1000 * (10 ** 18)
 
 @pytest.fixture
 def deployed_vvet(connector, wallet, vvet_contract):
@@ -76,6 +81,35 @@ def _view_lp_of_user(connector:Connect, user_addr:str, pool_addr:str, pool_contr
     return current_timestamp, lp
 
 
+def _view_total_lp(connector:Connect, pool_addr:str, pool_contract:Contract):
+    best_block = connector.get_block()
+    current_timestamp = best_block['timestamp']
+    r, res = helper_call(connector, None, pool_addr, pool_contract, 'totalSupply', [])
+    assert r == False
+    lp = int(res['decoded']['0'])
+    return current_timestamp, lp
+
+
+def _view_vtho(connector:Connect, user_addr:str, vtho_addr:str, vtho_contract:Contract):
+    ''' View VTHO of a single address '''
+    best_block = connector.get_block()
+    current_timestamp = best_block['timestamp']
+    r, res = helper_call(connector, user_addr, vtho_addr, vtho_contract, 'balanceOf', [user_addr])
+    assert r == False
+    lp = int(res['decoded']['0'])
+    return current_timestamp, lp
+
+
+def _view_vtho_interest(connector:Connect, user_addr:str, vvet_addr:str, vvet_contract:Contract):
+    ''' View VTHO that is related to a user, which is generated because of holding vvet '''
+    best_block = connector.get_block()
+    current_timestamp = best_block['timestamp']
+    r, res = helper_call(connector, user_addr, vvet_addr, vvet_contract, 'vthoBalance', [user_addr])
+    assert r == False
+    lp = int(res['decoded']['0'])
+    return current_timestamp, lp
+
+
 def _add_lp_vet_vtho(amount_vet:int, amount_vtho:int, vtho_addr:str, vtho_contract:Contract, router_addr:str, router:Contract, connector:Connect, wallet:Wallet):
     ''' Helper: Add liquidity to vvet/vtho pair '''
     # Approve some vtho
@@ -89,7 +123,7 @@ def _add_lp_vet_vtho(amount_vet:int, amount_vtho:int, vtho_addr:str, vtho_contra
     )
     assert r == False
     
-    helper_wait_for_block()
+    helper_wait_for_block(connector)
 
     # Add LP
     r, receipt = helper_transact(
@@ -101,6 +135,10 @@ def _add_lp_vet_vtho(amount_vet:int, amount_vtho:int, vtho_addr:str, vtho_contra
         [vtho_addr, amount_vtho, int(amount_vtho * 0.9), int(amount_vet * 0.9), wallet.getAddress(), int(time.time()) + 1000],
         amount_vet
     )
+    if r == True:
+        result = helper_replay(connector, receipt['meta']['txID'])
+        print(result)
+    
     assert r == False
     packed_timestamp = receipt['meta']['blockTimestamp']
     assert type(packed_timestamp) == int
@@ -121,7 +159,7 @@ def _remove_lp_vet_vtho(pool_addr:str, pool_contract:Contract, amount_lp:int, vt
         [router_addr, amount_lp]
     )
     assert r == False
-    helper_wait_for_block()
+    helper_wait_for_block(connector)
 
     # Remove LP
     r, receipt = helper_transact(
@@ -158,35 +196,139 @@ def _swap_vet_to_vtho(amount_vet:int, vet_addr:str, vtho_addr:str, router_addr:s
     return packed_timestamp
 
 
-def _view_contribution(connector:Connect, pool_addr:str, user_addr=None):
+def _view_contribution(connector:Connect, pool_addr:str, pool_contract:Contract, user_addr:str):
     ''' Helper: View contribution of a user, if not specified view the total contribution '''
-    pass
+    best_block = connector.get_block()
+    current_timestamp = best_block['timestamp']
+    r, res = helper_call(connector, user_addr, pool_addr, pool_contract, 'viewContribution', [user_addr])
+    assert r == False
+    return current_timestamp, int(res['decoded']['0'])
 
 
-def _view_vtho_claimable(connector:Connect, pool_addr:str, user_addr=None):
+def _view_total_contribution(connector:Connect, pool_addr:str, pool_contract:Contract, caller=None):
+    ''' Helper: View contribution of a user, if not specified view the total contribution '''
+    best_block = connector.get_block()
+    current_timestamp = best_block['timestamp']
+    r, res = helper_call(connector, caller, pool_addr, pool_contract, 'viewTotalContribution', [])
+    assert r == False
+    return current_timestamp, int(res['decoded']['0'])
+
+
+def _view_claimable_vtho(connector:Connect, pool_addr:str, pool_contract: Contract, user_addr=None):
     ''' Helper: Vew vtho claimable of a user, if not specified view the total claimable '''
-    pass
+    best_block = connector.get_block()
+    current_timestamp = best_block['timestamp']
+    if user_addr:
+        r, res = helper_call(connector, user_addr, pool_addr, pool_contract, 'viewUserGeneratedVTHO', [user_addr])
+    else:
+        r, res = helper_call(connector, None, pool_addr, pool_contract, 'viewTotalGeneratedVTHO', [])
+    assert r == False
+    return current_timestamp, int(res['decoded']['0'])    
 
 
-def _claim_vtho(connector:Connect, wallet:Wallet, pool_addr:str, amount_vtho:int):
+def _claim_vtho(connector:Connect, wallet:Wallet, receiver_addr:str, pool_addr:str, pool_contract: Contract, amount_vtho:int):
     ''' Helper: Claim some vtho generated (or bonus) '''
-    pass
+    r, receipt = helper_transact(
+        connector,
+        wallet,
+        pool_addr,
+        pool_contract,
+        'claimGeneratedVTHO',
+        [receiver_addr]
+    )
+    assert r == False
+    packed_timestamp = receipt['meta']['blockTimestamp']
+    assert type(packed_timestamp) == int
+    return packed_timestamp
 
 
-def test_vvet_vtho_pool(connector, wallet, factory_contract, deployed_vvet, deployed_factory, deployed_router02, vtho_contract_address):
+def test_vvet_vtho_pool(connector, wallet, factory_contract, v2pair_contract, erc20_contract, router02_contract, vvet_contract, deployed_vvet, deployed_factory, deployed_router02, vtho_contract_address):
     '''
         1) creation of vvet/vtho pool
-        2) user deposit, check vvet/vtho balance
+        2) user deposit, check pool vvet/vtho balance
         3) per block, check total contribution, user contribution (if they match)
         4) per block, check total vtho generated, user vtho claimable (if they match)
         5) remove all vvet/vtho
         6) per block, check growth of contribution, growth of vtho generated. (if they match)
-        7) user claim all the vtho generated.
+        7) user claim all the extra vtho generated.
         8) per block, check contribution, vtho generated (to be 0)
     '''
+    # create a pool of vet/vtho
     t_1, pool_addr = _create_or_check_pool(connector, deployed_vvet, vtho_contract_address, deployed_factory, factory_contract, wallet)
     assert pool_addr != None
 
+    # check user lp on the pool
+    t_2, lp = _view_lp_of_user(connector, wallet.getAddress(), pool_addr, v2pair_contract)
+    assert lp == 0
+
+    # user deposit 1000 VET + 1000 VTHO, gain some lp
+    t_3 = _add_lp_vet_vtho(AMOUNT, AMOUNT, vtho_contract_address, erc20_contract, deployed_router02, router02_contract, connector, wallet)
+
+    # check user lp on the pool, again
+    t_4, lp = _view_lp_of_user(connector, wallet.getAddress(), pool_addr, v2pair_contract)
+    assert lp > 0
+    # check total lp on the pool
+    t_4_2, total_lp = _view_total_lp(connector, pool_addr, v2pair_contract)
+    assert lp + 1000 == total_lp # slightly less, because of initial deduct of uni-v2 mint:sub(MINIMUM_LIQUIDITY), about 1000 to address(0)
+
+    # check contribution
+    helper_wait_for_block(connector)
+    t_5, c_1 = _view_contribution(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_6, c_2 = _view_total_contribution(connector, pool_addr, v2pair_contract, None)
+    assert t_5 == t_6
+    assert c_2 > 0
+    assert c_1 > 0
+
+    # check vtho claimable (which is generated by holding the lp)
+    helper_wait_for_block(connector)
+    t_7, cv_7 = _view_claimable_vtho(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_8, cv_8 = _view_claimable_vtho(connector, pool_addr, v2pair_contract, None)
+    # vtho generated by holding vvet (owner is the pool)
+    t_9, cv_9 = _view_vtho_interest(connector, pool_addr, deployed_vvet, vvet_contract)
+    # vtho in the pool (provided from lp, owner is the pool)
+    t_10, cv_10 = _view_vtho(connector, pool_addr, vtho_contract_address, erc20_contract)
+    # vtho generated by the vvet (owner is the pool, generated by vet)
+    t_11, cv_11 = _view_vtho(connector, deployed_vvet, vtho_contract_address, erc20_contract)
+    assert t_7 == t_8
+    assert t_7 == t_9
+    assert t_7 == t_10
+    assert t_7 == t_11
+    assert cv_7 <= cv_8 # user contribution cannot exceed total contribution
+    assert cv_8 == cv_9
+    assert cv_10 == AMOUNT
+    assert cv_9 == cv_11
+
+    # user remove all liquidity of the user
+    t_12 = _remove_lp_vet_vtho(pool_addr, v2pair_contract, lp, vtho_contract_address, deployed_router02, router02_contract, connector, wallet)
+    helper_wait_for_block(connector) # pack it
+
+    # check contribution, claimable vtho growth
+    t_13, cv_13 = _view_claimable_vtho(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_14, cv_14 = _view_claimable_vtho(connector, pool_addr, v2pair_contract, None)
+    assert t_13 == t_14
+    assert cv_13 <= cv_14
+
+    t_15, c_15 = _view_contribution(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_16, c_16 = _view_total_contribution(connector, pool_addr, v2pair_contract)
+    assert t_15 == t_16
+    assert c_15 > 0
+    assert c_16 >= c_15
+
+    # wait for another block
+    helper_wait_for_block(connector)
+
+    # check if the growth is stopped
+    t_17, cv_17 = _view_claimable_vtho(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_18, cv_18 = _view_claimable_vtho(connector, pool_addr, v2pair_contract, None)
+    assert t_17 == t_18
+    assert cv_17 == cv_13 # vtho interest stop growth of the user
+    assert cv_18 == cv_14 # vtho interest stop growth of pool
+
+    t_19, c_19 = _view_contribution(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_20, c_20 = _view_total_contribution(connector, pool_addr, v2pair_contract)
+    assert t_19 == t_20
+    assert c_19 == c_15 # user contribution shall be stopped.
+    assert c_20 >= c_16 # address(0) holds 1000 lp token, still generating contribution
 
 def test_vvet_vtho_pool_2():
     '''

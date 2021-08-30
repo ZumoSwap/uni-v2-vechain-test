@@ -3,6 +3,9 @@ from thor_requests.connect import Connect
 from thor_requests.contract import Contract
 from thor_requests.wallet import Wallet
 
+def helper_replay(connector: Connect, tx_id: str):
+    return connector.replay_tx(tx_id)
+
 def helper_deploy(connector: Connect, wallet: Wallet, contract: Contract, param_types=None, params=None) -> str:
     ''' Deploy a smart contract and return the created contract address'''
     res = connector.deploy(wallet, contract, param_types, params, 0)
@@ -14,7 +17,8 @@ def helper_deploy(connector: Connect, wallet: Wallet, contract: Contract, param_
 
 def helper_call(connector:Connect, caller:str, contract_addr:str, contract:Contract, func_name:str, func_params:list, value:int=0):
     '''Call on-chain, return reverted(bool), response'''
-    # Call to get the balance of user's vtho
+    if caller == None:
+        caller = '0x0000000000000000000000000000000000000000'
     res = connector.call(
         caller,
         contract,

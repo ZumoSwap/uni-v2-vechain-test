@@ -83,7 +83,7 @@ def factory_contract():
 
 @pytest.fixture
 def v2pair_contract():
-    return Contract.fromFile('build/contracts/IUniswapV2Pair.json')
+    return Contract.fromFile('build/contracts/UniswapV2Pair.json')
 
 
 @pytest.fixture
@@ -93,4 +93,9 @@ def router02_contract():
 
 @pytest.fixture
 def vvet_contract():
-    return Contract.fromFile('build/contracts/vvet9.json')
+    return Contract.fromFile('build/contracts/VVET9.json')
+
+
+@pytest.fixture
+def erc20_contract():
+    return Contract.fromFile('build/contracts/ERC20.json')
