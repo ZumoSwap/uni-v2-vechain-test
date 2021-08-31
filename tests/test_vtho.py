@@ -238,6 +238,7 @@ def _claim_vtho(connector:Connect, wallet:Wallet, receiver_addr:str, pool_addr:s
     )
     assert r == False
     packed_timestamp = receipt['meta']['blockTimestamp']
+    # print('receipt', receipt)
     assert type(packed_timestamp) == int
     return packed_timestamp
 
@@ -327,8 +328,16 @@ def test_vvet_vtho_pool(connector, wallet, factory_contract, v2pair_contract, er
     t_19, c_19 = _view_contribution(connector, pool_addr, v2pair_contract, wallet.getAddress())
     t_20, c_20 = _view_total_contribution(connector, pool_addr, v2pair_contract)
     assert t_19 == t_20
-    assert c_19 == c_15 # user contribution shall be stopped.
+    assert c_19 == c_15 # user contribution shall stop growing (all lp token removed).
     assert c_20 >= c_16 # address(0) holds 1000 lp token, still generating contribution
+
+    # user remove the vtho generated (claimable)
+    _, user_vtho_1 = _view_vtho(connector, wallet.getAddress(), vtho_contract_address, erc20_contract)
+    # print('before claim:', user_vtho_1)
+    # print('claimable:', cv_17)
+    t_21 = _claim_vtho(connector, wallet, wallet.getAddress(), pool_addr, v2pair_contract, cv_17)
+    _, user_vtho_2 = _view_vtho(connector, wallet.getAddress(), vtho_contract_address, erc20_contract)
+    # print('after claim:', user_vtho_2)
 
 def test_vvet_vtho_pool_2():
     '''
