@@ -401,12 +401,14 @@ def test_vvet_vtho_pool(connector, wallet, factory_contract, v2pair_contract, er
 def test_vvet_vtho_pool_2():
     '''
         1) creation of vvet/vtho pool
-        2) user1 deposit, check vvet/vtho balance
-        3) user2 deposit, check vvet/vtho balance
-        4) per block, check contribution (total, user1, user2)
-        5) same time check vtho generated/claimable (total, user1, user2)
-        6) user1 withdraw all vvet/vtho
-        7) per block, check contribution and vtho generated if match
+        2) user1 deposit, check lp balance
+        3) user2 deposit, check lp balance
+        per block, 
+        4) check contribution (total, user1, user2)
+        5) check vtho generated on vvet + vtho claimable (total, user1, user2)
+        6) check vtho/vet balance of pool, and of each user
+        7) user1 withdraw all lp
+        8) per block, check 4)-6) again.
     '''
     pass
 
@@ -414,11 +416,11 @@ def test_vvet_vtho_pool_2():
 def test_vvet_vtho_pool_3():
     '''
         1) creation of vvet/vtho pool
-        2) user1 deposit, check vvet/vtho balance
+        2) user1 deposit, check lp balance
         3) user2 swap
-        4) per block, check user contribution, vtho generated, vtho claimable (total, user1)
+        4) per block, check user1/total contribution, vtho generated, vtho claimable (total, user1)
         5) user2 swap
-        6) per block, check user coontribution, vtho generated, vtho claimable (total, user1)
+        6) per block, check user1/total coontribution, vtho generated, vtho claimable (total, user1)
     '''
     pass
 
@@ -426,10 +428,10 @@ def test_vvet_vtho_pool_3():
 def test_vvet_vtho_pool_4():
     '''
         1) creation of vvet/vtho pool
-        2) user1 deposit, check vvet/vtho balance
-        3) user2 deposit, check vvet/vtho balance
-        4) per block, check user contribution, vtho generated, claimable
+        2) user1 deposit, check lp balance
+        3) user2 deposit, check lp balance
+        4) per block, check user1/user2/total contribution, vtho generated, claimable
         5) admin airdrop directly some vtho into VVET smart contract (emulate bonus process).
-        6) per block, check user contribution, vtho generated, claimable
+        6) per block, check user1/user2/total contribution, vtho generated, claimable
     '''
     pass
