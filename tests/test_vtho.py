@@ -4,7 +4,6 @@
 
 import time
 import pytest
-from thor_requests import connect
 from thor_requests.connect import Connect
 from thor_requests.contract import Contract
 from thor_requests.wallet import Wallet
@@ -398,7 +397,7 @@ def test_vvet_vtho_pool(connector, wallet, factory_contract, v2pair_contract, er
     assert c_24 > 0
 
 
-def test_vvet_vtho_pool_2():
+def test_vvet_vtho_pool_2(connector:Connect, wallet:Wallet, clean_wallet:Wallet, factory_contract, v2pair_contract, erc20_contract, router02_contract, vvet_contract, deployed_vvet, deployed_factory, deployed_router02, vtho_contract_address):
     '''
         1) creation of vvet/vtho pool
         2) user1 deposit, check lp balance
@@ -408,10 +407,38 @@ def test_vvet_vtho_pool_2():
         5) check vtho generated on vvet + vtho claimable (total, user1, user2)
         6) check vtho/vet balance of pool, and of each user
         7) user1 withdraw all lp
-        8) per block, check 4)-6) again.
+        per block, 
+        8) check 4)-6) again.
     '''
-    pass
+    # create a pool of vet/vtho
+    t_1, pool_addr = _create_or_check_pool(connector, deployed_vvet, vtho_contract_address, deployed_factory, factory_contract, wallet)
+    assert pool_addr != None
 
+    # user1 send some money to user2: 1000 VET + 1000 VTHO
+    connector.transfer_vet(wallet, clean_wallet.getAddress(), AMOUNT)
+    connector.transfer_vtho(wallet, clean_wallet.getAddress(), AMOUNT)
+
+    # View lp of both users
+    t_2, lp_2_1 = _view_lp_of_user(connector, wallet.getAddress(), pool_addr, v2pair_contract)
+    t_2_1, lp_2_2 = _view_lp_of_user(connector, wallet.getAddress(), pool_addr, v2pair_contract)
+    assert lp_2_1 == 0
+    assert lp_2_2 == 0
+
+    # User1 deposit 1000 VET + 1000 VTHO
+    # User2 deposit 500 VET + 500 VTHO
+    t_3 = _add_lp_vet_vtho(AMOUNT, AMOUNT, vtho_contract_address, erc20_contract, deployed_router02, router02_contract, connector, wallet)
+    t_4 = _add_lp_vet_vtho(AMOUNT//2, AMOUNT//2, vtho_contract_address, erc20_contract, deployed_router02, router02_contract, connector, clean_wallet)
+
+    # Check users' lp, total lp
+    t_5, lp_5 = _view_lp_of_user(connector, wallet.getAddress(), pool_addr, v2pair_contract)
+    print('user1 lp:', lp_5)
+    assert lp_5 > 0
+    t_6, lp_6 = _view_lp_of_user(connector, clean_wallet.getAddress(), pool_addr, v2pair_contract)
+    print('user2 lp:', lp_6)
+    assert lp_6 > 0
+    t_7, total_lp = _view_total_lp(connector, pool_addr, v2pair_contract)
+    print('total lp:', total_lp)
+    assert lp_5 + lp_6 + 1000 == total_lp
 
 def test_vvet_vtho_pool_3():
     '''
