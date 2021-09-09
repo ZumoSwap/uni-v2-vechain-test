@@ -440,6 +440,31 @@ def test_vvet_vtho_pool_2(connector:Connect, wallet:Wallet, clean_wallet:Wallet,
     print('total lp:', total_lp)
     assert lp_5 + lp_6 + 1000 == total_lp
 
+    helper_wait_for_block(connector)
+
+    t_8, c_8 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, None)
+    t_9, c_9 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_10, c_10 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, clean_wallet.getAddress())
+    t_11, c_11 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, None)
+    t_12, c_12 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_13, c_13 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, clean_wallet.getAddress())
+    assert t_8 == t_9 == t_10 == t_11 == t_12 == t_13
+    print(f'contribution: pool {c_8}, user1 {c_9}, user2 {c_10}')
+    print(f'vtho bonus: pool {c_11}, user1 {c_12}, user2 {c_13}')
+
+    helper_wait_for_block(connector)
+
+    t_8_2, c_8_2 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, None)
+    t_9_2, c_9_2 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_10_2, c_10_2 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, clean_wallet.getAddress())
+    t_11_2, c_11_2 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, None)
+    t_12_2, c_12_2 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_13_2, c_13_2 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, clean_wallet.getAddress())
+    assert t_8_2 == t_9_2 == t_10_2 == t_11_2 == t_12_2 == t_13_2
+    print(f'contribution: pool {c_8_2}, user1 {c_9_2}, user2 {c_10_2}')
+    print(f'vtho bonus: pool {c_11_2}, user1 {c_12_2}, user2 {c_13_2}')
+
+
 def test_vvet_vtho_pool_3():
     '''
         1) creation of vvet/vtho pool
