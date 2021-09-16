@@ -408,13 +408,11 @@ def test_vvet_vtho_pool_2(connector:Connect, wallet:Wallet, clean_wallet:Wallet,
     '''
         1) creation of vvet/vtho pool
         2) user1 deposit, check lp balance
-        3) user2 deposit, check lp balance
-        per block, 
+        3) user2 deposit, check lp balance 
         4) check contribution (total, user1, user2)
         5) check vtho interest & claimable interest (total, user1, user2)
         6) check vtho/vet balance of pool, and of each user
         7) user1 withdraw all lp
-        per block, 
         8) check 4)-6) again.
     '''
     print('')
@@ -507,8 +505,36 @@ def test_vvet_vtho_pool_2(connector:Connect, wallet:Wallet, clean_wallet:Wallet,
     assert c_8_2_1 == c_8_1 + _calculate_contrib(t_8_1, t_8_2_1, 1000)
 
     # Check if vtho interest growth matches the time
-    assert c_11_2 == c_11 + _calculate_vtho(t_11, t_11_2, c_16) # total
+    assert c_11_2 == c_11 + _calculate_vtho(t_11, t_11_2, c_16)
 
+    # User1 removes all liquidity
+    t_17 = _remove_lp_vet_vtho(pool_addr, v2pair_contract, lp_5, vtho_contract_address, deployed_router02, router02_contract, connector, wallet)
+    print('user1 removed all liquidity')
+    
+    helper_wait_for_block(connector)
+
+    # Check vital data again
+    t_8_3_1, c_8_3_1 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, ADDR_ZERO)
+    t_8_3, c_8_3 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, None)
+    t_9_3, c_9_3 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_10_3, c_10_3 = _view_contribution_on_pool(connector, pool_addr, v2pair_contract, clean_wallet.getAddress())
+
+    t_11_3_1, c_11_3_1 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, ADDR_ZERO)
+    t_11_3, c_11_3 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, None)
+    t_12_3, c_12_3 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, wallet.getAddress())
+    t_13_3, c_13_3 = _view_claimable_vtho_on_pool(connector, pool_addr, v2pair_contract, clean_wallet.getAddress())
+
+    t_14_3, c_14_3 = _view_vtho(connector, pool_addr, vtho_contract_address, erc20_contract) # vtho that the pool holds (the vtho lp provided)
+    t_15_3, c_15_3 = _view_vtho_interest_on_vvet(connector, pool_addr, deployed_vvet, vvet_contract) # vtho that the pool generates (vtho by holding vvet)
+    t_16_3, c_16_3 = _view_vvet(connector, pool_addr, deployed_vvet, vvet_contract) # vvet the pool holds (the vet lp provided)
+
+    assert t_8_3 == t_9_3 == t_10_3 == t_11_3 == t_12_3 == t_13_3 == t_14_3 == t_15_3 == t_16_3
+    print(f'contribution: pool: {c_8_3}, address(0): {c_8_3_1}, user1: {c_9_3}, user2: {c_10_3}')
+    assert c_8_3 == c_8_3_1 + c_9_3 + c_10_3
+    print(f'vtho interest: pool: {c_11_3}, address(0): {c_11_3_1}, user1: {c_12_3}, user2: {c_13_3}')
+    assert c_11_3 >= c_11_3_1 + c_12_3 + c_13_3
+    print(f'pool: vvet: {c_16_3}, vtho: {c_14_3}, vtho interest: {c_15_3}')
+    assert c_11_3 == c_15_3
 
 def test_vvet_vtho_pool_3():
     '''
