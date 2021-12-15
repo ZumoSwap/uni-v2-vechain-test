@@ -1,4 +1,4 @@
-# VeChain specific tests for uni-v2 smart contracts
+# ZumoSwap Smart Contracts (VeChain specific tests)
 
 ## Consideration:
 1) Calculated VTHO generation on VET/* pools.
